@@ -2,6 +2,7 @@
 
 import os
 import sys
+import zlib
 import struct
 
 def get_u8(buf, off):
@@ -35,12 +36,15 @@ def main(argc=len(sys.argv), argv=sys.argv):
     for i in range(numfiles):
         fileoff    = get_u32_le(arcbuf, metaoff+0x00)
         namelen    = get_u16_le(arcbuf, metaoff+0x04)
-        #unkflag   = get_u8    (arcbuf, metaoff+0x06)
-        #filesize1 = get_u32_le(arcbuf, metaoff+0x0C)
-        filesize2  = get_u32_le(arcbuf, metaoff+0x10)
+        zlibflag   = get_u8    (arcbuf, metaoff+0x06)
+        #fullsize  = get_u32_le(arcbuf, metaoff+0x0C)
+        filesize   = get_u32_le(arcbuf, metaoff+0x10)
         nameoff    = get_u32_le(arcbuf, metaoff+0x14)
 
         name = arcbuf[nameoff:nameoff+namelen].decode("ASCII")
+        data = arcbuf[fileoff:fileoff+filesize]
+        if zlibflag:
+            data = zlib.decompress(data)
 
         outpath = os.path.join(in_dir, name)
 
@@ -50,10 +54,7 @@ def main(argc=len(sys.argv), argv=sys.argv):
             os.makedirs(outdir)
 
         with open(outpath, "wb") as fout:
-            # filesize1 and filesize2 will differ when unkflag is 1 (rare)
-            # filesize2 seems to be the "real" size, but I'm probably
-            # misinterpreting something here
-            fout.write(arcbuf[fileoff:fileoff+filesize2])
+            fout.write(data)
 
         metaoff += 24
 
